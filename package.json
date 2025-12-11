@@ -1,0 +1,20 @@
+{
+  "name": "xm-rn-webview",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.81.5",
+    "react-native-webview": "*",
+    "xm-rn-permissions": "*",
+    "react-native-permissions": "*",
+    "xm-rn-risk": "*"
+  }
+}
