@@ -244,6 +244,7 @@ export function AppWebView(
             ref={webviewRef}
             onMessage={receiveMessageFromH5}
             style={{ flex: 1 }}
+            scalesPageToFit={false}
         />
     );
 }
