@@ -1,13 +1,11 @@
 import { useRef } from "react";
 import WebView from "react-native-webview";
-
-import { PermissionCode, requestMultiplePermissions, requestPermission } from 'xm-rn-permissions'
-import { openSettings, RESULTS } from "react-native-permissions";
-import { Linking } from "react-native";
+import { Linking, StyleProp, ViewStyle } from "react-native";
 import {
-    addCalendarEvents, buildWebviewEnv, createRiskBuilder, createSupermarketReview, getLocation,
-    openCamera, openGallery, selectContactPhone
-} from "xm-rn-risk";
+    PermissionCode, usePermission, useLocation, useImagePicker,
+    useContact, useAppReview, useCalendar, createRiskBuilder, useDeviceInfo
+} from 'xm-rn'
+
 
 // isH5Login
 const NOT_NEED_REPLAY = "__NOT_NEED_REPLAY__"
@@ -42,8 +40,16 @@ interface I_AppWebViewEnv {
     statusBarHeight: number
     ownerShip: string
     openOCR: boolean
-    hybridVersion: number
+    hybridVersion?: number
     firstKey: string
+
+    permissionModule?: ReturnType<typeof usePermission>
+    locationModule?: ReturnType<typeof useLocation>
+    imagePickerModule?: ReturnType<typeof useImagePicker>
+    contactModule?: ReturnType<typeof useContact>
+    appReviewModule?: ReturnType<typeof useAppReview>
+    calendarModule?: ReturnType<typeof useCalendar>
+    deviceInfoModule?: ReturnType<typeof useDeviceInfo>
 
     permissions?: PermissionCode[]
 
@@ -55,18 +61,29 @@ interface I_AppWebViewEnv {
     onGetUserInfo: () => { token: string; cellular: string; uuid: string; userIsTester: string }
     onUpload: (data: any) => Promise<void>
     onGetSupermarketUrl: () => Promise<string>
+
+    webviewStyle?: StyleProp<ViewStyle>
 }
 export function AppWebView(
     props: I_AppWebViewEnv
 ) {
 
     const {
+
+        permissionModule,
+        locationModule,
+        imagePickerModule,
+        contactModule,
+        appReviewModule,
+        calendarModule,
+        deviceInfoModule,
+
         permissions = [],
         onLogout, onWebLoginSuccess, onOpenOCR, onGetUserInfo, onUpload, builder, onGetSupermarketUrl,
         url,
         i18n, country, afId,
         statusBarHeight, ownerShip, openOCR,
-        hybridVersion, firstKey,
+        hybridVersion = 1, firstKey,
 
     } = props;
     const webviewRef = useRef<WebView>(null);
@@ -110,42 +127,47 @@ export function AppWebView(
             const eventType = eventInfo.type;
             const eventData = eventInfo.data;
             console.log(`[xm-rn-webview]: 接收事件${eventType}-->${eventData})`);
-            const isPermissionDeniedForever = (value: any) => value == RESULTS.BLOCKED || value === RESULTS.LIMITED || value === RESULTS.UNAVAILABLE
+            const isPermissionDeniedForever = (value: any) => value == "blocked" || value === "limited" || value === "unavailable"
             if (eventType === H5Events.getAllPermission) {
-                const result = await requestMultiplePermissions(permissions ?? []);
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入权限模块`);
+                const result = await permissionModule.requestMultiplePermissions(permissions ?? []);
                 const responseData = {
-                    isGranted: result.every(item => item.status === RESULTS.GRANTED || item.status == "ignored_permission"),
+                    isGranted: result.every(item => item.status === "granted" || item.status == "ignored_permission"),
                     isPermanentlyDenied: result.some(item => isPermissionDeniedForever(item.status)),
-                    rejectPermission: result.filter(item => (item.status != RESULTS.GRANTED && item.status != "ignored_permission")).map(item => item.serviceCode),
+                    rejectPermission: result.filter(item => (item.status != "granted" && item.status != "ignored_permission")).map(item => item.serviceCode),
                     alwaysRejectPermission: result.filter(item => isPermissionDeniedForever(item.status)).map(item => item.serviceCode)
                 }
                 return replayMessage(eventType, responseData)
-
             }
 
             if (eventType === H5Events.getPermission) {
-                const result = await requestPermission?.(eventData?.type);
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入权限模块`);
+                const result = await permissionModule.requestPermission?.(eventData?.type);
                 const responseData = {
-                    isGranted: (result == RESULTS.GRANTED || result == "ignored_permission"),
+                    isGranted: (result == "granted" || result == "ignored_permission"),
                     isPermanentlyDenied: isPermissionDeniedForever(result)
                 }
                 return replayMessage(eventType, responseData)
             }
 
             if (eventType === H5Events.openAppSettings) {
-                await openSettings()
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                await permissionModule.openSettings()
                 return replayMessage(eventType, NOT_NEED_REPLAY)
             }
 
             if (eventType === H5Events.imageFromCamera) {
-                const requestResult = await requestPermission(PermissionCode.Camera);
-                if (requestResult != RESULTS.GRANTED) return
-                const result = await openCamera();
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                const requestResult = await permissionModule.requestPermission(PermissionCode.Camera);
+                if (requestResult != "granted") return
+                if (!imagePickerModule) return console.error(`[xm-rn-webview]: 未注入imagePicker模块`);
+                const result = await imagePickerModule.openCamera();
                 return replayMessage(eventType, result)
             }
 
             if (eventType === H5Events.imageFromGallery) {
-                const result = await openGallery();
+                if (!imagePickerModule) return console.error(`[xm-rn-webview]: 未注入imagePicker模块`);
+                const result = await imagePickerModule.openGallery();
                 return replayMessage(eventType, result)
             }
 
@@ -155,18 +177,20 @@ export function AppWebView(
             }
 
             if (eventType === H5Events.pickContact) {
-                const result = await selectContactPhone();
+                if (!contactModule) return console.error(`[xm-rn-webview]: 未注入contactModule模块`);
+                const result = await contactModule.selectContactPhone();
                 return replayMessage(eventType, result)
             }
 
             if (eventType === H5Events.requestInAppReview) {
-                const open = await createSupermarketReview(onGetSupermarketUrl)
-                await open()
+                if (!appReviewModule) return console.error(`[xm-rn-webview]: 未注入appReview模块`);
+                await appReviewModule.openAppMarket()
                 return replayMessage(eventType, NOT_NEED_REPLAY)
             }
 
             if (eventType === H5Events.uploadAllDeviceData) {
-                await requestMultiplePermissions(permissions);
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                await permissionModule.requestMultiplePermissions(permissions);
                 const dataList = await builder(permissions)
                 const promiseList = dataList.map(item => onUpload?.(item))
                 await Promise.allSettled(promiseList);
@@ -174,7 +198,10 @@ export function AppWebView(
             }
 
             if (eventType === H5Events.uploadDeviceData) {
-                await requestMultiplePermissions(eventData.type);
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                await permissionModule.requestMultiplePermissions(eventData.type);
+
+                // 上传数据
                 const dataList = await builder(eventData.type)
                 const promiseList = dataList.map(item => onUpload?.(item))
                 await Promise.allSettled(promiseList);
@@ -185,7 +212,8 @@ export function AppWebView(
                 return replayMessage(eventType, NOT_NEED_REPLAY)
             }
             if (eventType === H5Events.getEnv) {
-                const temp = await buildWebviewEnv()
+                if (!deviceInfoModule) return console.error(`[xm-rn-webview]: 未注入deviceInfoModule模块`);
+                const temp = await deviceInfoModule.buildWebviewEnv()
                 return replayMessage(H5Events.getEnv, {
                     ...temp,
                     i18n, country, afId,
@@ -198,9 +226,12 @@ export function AppWebView(
                 return replayMessage(eventType, userInfo)
             }
             if (eventType === H5Events.addCalendar) {
-                const requestResult = await requestPermission(PermissionCode.Calendar);
-                if (requestResult != RESULTS.GRANTED) return
-                await addCalendarEvents(eventData)
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                const requestResult = await permissionModule.requestPermission(PermissionCode.Calendar);
+                if (requestResult != "granted") return
+
+                if (!calendarModule) return console.error(`[xm-rn-webview]: 未注入calendarModule模块`);
+                await calendarModule.addCalendarEvents(eventData)
                 return replayMessage(eventType, NOT_NEED_REPLAY)
             }
 
@@ -210,9 +241,12 @@ export function AppWebView(
                 return replayMessage(H5Events.openOCR, REPLAY_WAIT_APP_CALLBACK)
             }
             if (eventType === H5Events.getLocation) {
-                const requestResult = await requestPermission(PermissionCode.Location);
-                if (requestResult != RESULTS.GRANTED) return
-                const data = await getLocation()
+                if (!permissionModule) return console.error(`[xm-rn-webview]: 未注入permissionModule模块`);
+                const requestResult = await permissionModule.requestPermission(PermissionCode.Location);
+                if (requestResult != "granted") return
+
+                if (!locationModule) return console.error(`[xm-rn-webview]: 未注入locationModule模块`);
+                const data = await locationModule.getCurrentPosition()
                 return replayMessage(eventType, data)
             }
 
@@ -243,7 +277,7 @@ export function AppWebView(
             source={{ uri: url }}
             ref={webviewRef}
             onMessage={receiveMessageFromH5}
-            style={{ flex: 1 }}
+            style={[{ flex: 1 }, props.webviewStyle]}
             scalesPageToFit={false}
         />
     );
