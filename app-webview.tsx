@@ -43,6 +43,7 @@ interface I_AppWebViewEnv {
     openOCR: boolean
     hybridVersion?: number
     firstKey: string
+    appColor: string
 
     permissionModule?: ReturnType<typeof usePermission>
     locationModule?: ReturnType<typeof useLocation>
@@ -59,7 +60,7 @@ interface I_AppWebViewEnv {
     onLogout: () => Promise<void>
     onWebLoginSuccess: (loginInfo?: any) => void
     onOpenOCR: (data: any) => void
-    onGetUserInfo: () => { token: string; cellular: string; uuid: string; userIsTester: string }
+    onGetUserInfo: () => { token: string; cellular: string; uuid: string; userIsTester: string } | undefined
     onUpload: (data: any) => Promise<void>
     // onGetSupermarketUrl: () => Promise<string>
 
@@ -84,7 +85,7 @@ export function AppWebView(
         url,
         i18n, country, afId,
         statusBarHeight, ownerShip, openOCR,
-        hybridVersion = 1, firstKey,
+        hybridVersion = 1, firstKey, appColor,
 
     } = props;
     const webviewRef = useRef<WebView>(null);
@@ -219,7 +220,7 @@ export function AppWebView(
                     ...temp,
                     i18n, country, afId,
                     statusBarHeight, ownerShip, openOCR,
-                    hybridVersion, firstKey,
+                    hybridVersion, firstKey, appColor
                 })
             }
             if (eventType === H5Events.getUser) {
