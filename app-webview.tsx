@@ -37,7 +37,6 @@ interface I_AppWebViewEnv {
     url: string
     i18n: string
     country: string
-    afId: string
     statusBarHeight: number
     ownerShip: string
     openOCR: boolean
@@ -62,6 +61,8 @@ interface I_AppWebViewEnv {
     onOpenOCR: (data: any) => void
     onGetUserInfo: () => { token: string; cellular: string; uuid: string; userIsTester: string } | undefined
     onUpload: (data: any) => Promise<void>
+
+    getAppsFlyerId: () => Promise<string>
     // onGetSupermarketUrl: () => Promise<string>
 
     webviewStyle?: StyleProp<ViewStyle>
@@ -83,9 +84,10 @@ export function AppWebView(
         permissions = [],
         onLogout, onWebLoginSuccess, onOpenOCR, onGetUserInfo, onUpload, builder,
         url,
-        i18n, country, afId,
+        i18n, country,
         statusBarHeight, ownerShip, openOCR,
         hybridVersion = 1, firstKey, appColor,
+        getAppsFlyerId
 
     } = props;
     const webviewRef = useRef<WebView>(null);
@@ -215,6 +217,7 @@ export function AppWebView(
             }
             if (eventType === H5Events.getEnv) {
                 if (!deviceInfoModule) return console.error(`[xm-rn-webview] 未注入deviceInfoModule模块`);
+                const afId = await getAppsFlyerId();
                 const temp = await deviceInfoModule.buildWebviewEnv()
                 return replayMessage(H5Events.getEnv, {
                     ...temp,
