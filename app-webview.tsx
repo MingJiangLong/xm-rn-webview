@@ -1,11 +1,10 @@
-import { useRef } from "react";
+import { Ref, useImperativeHandle, useRef } from "react";
 import WebView from "react-native-webview";
 import { Linking, StyleProp, ViewStyle } from "react-native";
 import {
     PermissionCode, usePermission, useLocation, useImagePicker,
     useContact, useAppReview, useCalendar, createRiskBuilder, useDeviceInfo
 } from 'xm-rn'
-
 
 // isH5Login
 const NOT_NEED_REPLAY = "__NOT_NEED_REPLAY__"
@@ -58,17 +57,15 @@ interface I_AppWebViewEnv {
 
     onLogout: () => Promise<void>
     onWebLoginSuccess: (loginInfo?: any) => void
-    onOpenOCR: (data: any) => void
+    onOpenOCR: (data: any) => Promise<any>
     onGetUserInfo: () => { token: string; cellular: string; uuid: string; userIsTester: string } | undefined
     onUpload: (data: any) => Promise<void>
     onGetAppsFlyerId: () => Promise<string>
-
-    // onGetSupermarketUrl: () => Promise<string>
-
     webviewStyle?: StyleProp<ViewStyle>
 }
 export function AppWebView(
-    props: I_AppWebViewEnv
+    props: I_AppWebViewEnv,
+    ref: Ref<{ replayMessage: (eventType: string, data: any) => void }>
 ) {
 
     const {
@@ -90,21 +87,23 @@ export function AppWebView(
         onGetAppsFlyerId
 
     } = props;
-    const webviewRef = useRef<WebView>(null);
+    const webviewRef = useRef<WebView<{}>>(null);
     function replayMessage(eventType: string, data: any) {
-        if (!webviewRef.current) {
-            return console.error(`[xm-rn-webview]: 回复事件失败!,webview ref不存在!`);
-        };
-
         // 不需要回复
         if (data === NOT_NEED_REPLAY) {
             return console.log(`[xm-rn-webview]: ${eventType}事件结束-->无需回复)`);
         }
 
+
+
         // 需要等待App主动回复
         if (data === REPLAY_WAIT_APP_CALLBACK) {
             return console.log(`[xm-rn-webview]: ${eventType}已事件执行-->等待app主动回复)`);
         }
+        if (!webviewRef.current) {
+            return console.error(`[xm-rn-webview]: 回复事件失败!,webview ref不存在!`);
+        };
+
         console.log(`[xm-rn-webview]: 回复${eventType}-->${JSON.stringify(data)})`);
         webviewRef.current.injectJavaScript(`window?.postMsg("${eventType}",  JSON.stringify(${JSON.stringify(data)}));`,)
     }
@@ -242,8 +241,8 @@ export function AppWebView(
 
             // 该事件为特殊事件 不需要返回
             if (eventType === H5Events.openOCR) {
-                onOpenOCR?.(eventData);
-                return replayMessage(H5Events.openOCR, REPLAY_WAIT_APP_CALLBACK)
+                const result = await onOpenOCR?.(eventData);
+                return replayMessage(H5Events.openOCR, result)
             }
             if (eventType === H5Events.getLocation) {
                 if (!permissionModule) return console.error(`[xm-rn-webview] 未注入permissionModule模块`);
@@ -276,6 +275,7 @@ export function AppWebView(
         }
 
     }
+
     return (
 
         <WebView
@@ -292,4 +292,6 @@ export function AppWebView(
             scalesPageToFit={false}
         />
     );
+
+
 }
