@@ -64,8 +64,7 @@ interface I_AppWebViewEnv {
     webviewStyle?: StyleProp<ViewStyle>
 }
 export function AppWebView(
-    props: I_AppWebViewEnv,
-    ref: Ref<{ replayMessage: (eventType: string, data: any) => void }>
+    props: I_AppWebViewEnv
 ) {
 
     const {
