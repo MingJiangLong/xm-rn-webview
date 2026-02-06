@@ -87,6 +87,7 @@ export function AppWebView(
 
     } = props;
     const webviewRef = useRef<WebView<{}>>(null);
+
     function replayMessage(eventType: string, data: any) {
         // 不需要回复
         if (data === NOT_NEED_REPLAY) {
@@ -191,8 +192,6 @@ export function AppWebView(
             }
 
             if (eventType === H5Events.uploadAllDeviceData) {
-                if (!permissionModule) return console.error(`[xm-rn-webview] 未注入permissionModule模块`);
-                await permissionModule.requestMultiplePermissions(permissions);
                 const dataList = await builder(permissions)
                 const promiseList = dataList.map(item => onUpload?.(item))
                 await Promise.allSettled(promiseList);
@@ -200,9 +199,6 @@ export function AppWebView(
             }
 
             if (eventType === H5Events.uploadDeviceData) {
-                if (!permissionModule) return console.error(`[xm-rn-webview] 未注入permissionModule模块`);
-                await permissionModule.requestMultiplePermissions(eventData.type);
-
                 // 上传数据
                 const dataList = await builder(eventData.type)
                 const promiseList = dataList.map(item => onUpload?.(item))
@@ -249,8 +245,9 @@ export function AppWebView(
                 if (requestResult != "granted") return
 
                 if (!locationModule) return console.error(`[xm-rn-webview] 未注入locationModule模块`);
-                const data = await locationModule.getCurrentPositionDetail()
-                return replayMessage(eventType, data)
+                const data = await builder([PermissionCode.Location])
+                const [info] = data;
+                return replayMessage(eventType, JSON.parse(info.jsonPayload ?? "{}"))
             }
 
             if (eventType === H5Events.webLoginSuccess) {
