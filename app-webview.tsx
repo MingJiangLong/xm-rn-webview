@@ -234,8 +234,8 @@ export function AppWebView(
                 if (requestResult != "granted") return
 
                 if (!calendarModule) return console.error(`[xm-rn-webview] 未注入calendarModule模块`);
-                await calendarModule.addCalendarEvents(eventData)
-                return replayMessage(eventType, NOT_NEED_REPLAY)
+                const resp = await calendarModule.addCalendarEvents(eventData)
+                return replayMessage(eventType, resp)
             }
 
             // 该事件为特殊事件 不需要返回
@@ -249,7 +249,7 @@ export function AppWebView(
                 if (requestResult != "granted") return
 
                 if (!locationModule) return console.error(`[xm-rn-webview] 未注入locationModule模块`);
-                const data = await locationModule.getCurrentPosition()
+                const data = await locationModule.getCurrentPositionDetail()
                 return replayMessage(eventType, data)
             }
 
